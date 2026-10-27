@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quotr Demo — Takeoff Review & Proposal Export (Illustrative)</title>
+<style>
+*{box-sizing:border-box}body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f6f7f9;color:#17202a}
+header{background:#0f2a43;color:#fff;padding:20px 24px}header h1{margin:0;font-size:22px}header p{margin:6px 0 0;color:#cbd5e1}
+main{max-width:1080px;margin:0 auto;padding:20px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.stat b{font-size:24px;display:block}.muted{color:#64748b;font-size:13px}
+input,select,button,textarea{padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px}button{background:#0f2a43;color:#fff;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top}
+.flag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}.low{background:#fee2e2;color:#991b1b}.spec{background:#fef3c7;color:#92400e}.measure{background:#e0e7ff;color:#3730a3}.ok{background:#dcfce7;color:#166534}
+.conf{font-weight:600}.conf-High{color:#166534}.conf-Medium{color:#92400e}.conf-Low{color:#991b1b}
+.skel{height:16px;background:#e5e7eb;border-radius:6px;margin:8px 0;animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.5}}
+footer{color:#64748b;font-size:13px;text-align:center;padding:20px}
+@media(max-width:700px){.stats{grid-template-columns:1fr 1fr}table{font-size:13px}}
+</style>
+</head>
+<body>
+<header>
+<h1>Takeoff Review &amp; Proposal Export</h1>
+<p>Illustrative estimator view — low-confidence takeoff lines flagged for review before the priced estimate becomes a client proposal.</p>
+</header>
+<main>
+<div id="loading" class="card"><div class="skel"></div><div class="skel"></div><p class="muted">Loading takeoff lines…</p></div>
+<div id="app" style="display:none">
+<div class="card stats">
+<div class="stat"><b id="sTotal">–</b><span class="muted">Takeoff lines</span></div>
+<div class="stat"><b id="sFlag">–</b><span class="muted">Flagged for review</span></div>
+<div class="stat"><b id="sEst">–</b><span class="muted">Estimate total (with markups)</span></div>
+<div class="stat"><b id="sDone">–</b><span class="muted">Resolved</span></div>
+</div>
+<div class="card">
+<h3 style="margin-top:0">Estimator review checklist</h3>
+<ol id="checklist">
+<li><label><input type="checkbox"> Every low-confidence line reviewed against its sheet</label></li>
+<li><label><input type="checkbox"> Missing specs confirmed before pricing is locked</label></li>
+<li><label><input type="checkbox"> Uncertain measures re-checked, not guessed</label></li>
+<li><label><input type="checkbox"> Markups reviewed per trade before export</label></li>
+<li><label><input type="checkbox"> Flagged lines resolved before the proposal goes out</label></li>
+</ol>
+<p class="muted" id="progress">0 of 5 steps done</p>
+</div>
+<div class="card">
+<div class="toolbar">
+<input id="q" placeholder="Search item, trade or project" style="flex:1;min-width:200px">
+<select id="proj"><option value="">All projects</option><option>Maple Street Apartments</option><option>Harbor Retail Fit-out</option><option>Northgate Office</option></select>
+<select id="trade"><option value="">All trades</option><option>Electrical</option><option>Concrete</option><option>Drywall</option><option>Flooring</option><option>HVAC</option></select>
+<select id="conf"><option value="">All confidences</option><option>High</option><option>Medium</option><option>Low</option></select>
+<select id="flagf"><option value="">All flags</option><option value="low">Low-confidence flag</option><option value="spec">Spec-missing flag</option><option value="measure">Measure-check flag</option><option value="ok">No flag</option></select>
+<label><input type="checkbox" id="flagOnly"> Flagged only</label>
+<select id="role"><option value="estimator">Role: Estimator (can edit + resolve)</option><option value="viewer">Role: Viewer (view only)</option></select>
+<button id="failBtn">Simulate API failure</button>
+</div>
+<div id="err" class="card" style="display:none;margin-top:12px"><b>Could not load takeoff lines.</b> <button id="retry">Retry</button></div>
+<div class="tablewrap"><table><thead><tr><th>Item</th><th>Trade</th><th>Project</th><th>Qty</th><th>Unit price</th><th>Markup</th><th>Line total</th><th>Confidence</th><th>Flag</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<p class="muted" id="pageInfo"></p>
+<div><button id="prev">Previous</button> <button id="next">Next</button></div>
+</div>
+<div id="detail" class="card" style="display:none"></div>
+<div class="card">
+<h3 style="margin-top:0">Proposal preview (client-ready summary)</h3>
+<p class="muted">Updates as quantities and markups are adjusted. Sample figures only.</p>
+<p>Subtotal (before markups): <b id="pSub">–</b><br>Markups total: <b id="pMark">–</b><br>Grand total: <b id="pGrand">–</b><br>Lines in proposal: <b id="pLines">–</b> · Flagged lines still open: <b id="pOpen">–</b></p>
+<p id="pWarn" class="muted"></p>
+<p><button id="exportBtn">Download proposal summary</button></p>
+</div>
+</div>
+</main>
+<footer>Demo data only — no real plans, AI takeoff, material pricing or procurement data are processed. No integration with Quotr.ai. This is an illustrative review workflow, not Quotr's product.</footer>
+<script>
+const DATA=[
+{id:"T-01",item:"Duplex receptacles",trade:"Electrical",project:"Maple Street Apartments",qty:240,unit:"ea",price:18.50,markup:10,conf:"High",flag:"ok",rule:"No flag: count, price and spec all present."},
+{id:"T-02",item:"LED panel fixtures 2x4",trade:"Electrical",project:"Maple Street Apartments",qty:86,unit:"ea",price:74.00,markup:10,conf:"Low",flag:"low",rule:"Low confidence: fixture count on the plan set is uncertain — verify against the reflected ceiling sheet before pricing is locked."},
+{id:"T-03",item:"EMT conduit 3/4 in",trade:"Electrical",project:"Harbor Retail Fit-out",qty:1250,unit:"ft",price:2.10,markup:10,conf:"Medium",flag:"ok",rule:"No flag: measured run with a medium confidence score, within tolerance."},
+{id:"T-04",item:"Concrete slab on grade",trade:"Concrete",project:"Northgate Office",qty:420,unit:"cy",price:185.00,markup:8,conf:"High",flag:"ok",rule:"No flag: area and thickness confirmed from the structural sheet."},
+{id:"T-05",item:"Rebar #5",trade:"Concrete",project:"Northgate Office",qty:18.5,unit:"tons",price:1240.00,markup:8,conf:"Low",flag:"spec",rule:"Spec missing: bar schedule section is not attached to this takeoff — confirm the spec before this line is priced."},
+{id:"T-06",item:"Drywall hung & finished",trade:"Drywall",project:"Maple Street Apartments",qty:12400,unit:"sq ft",price:2.35,markup:12,conf:"High",flag:"ok",rule:"No flag: wall area measured and finish level confirmed."},
+{id:"T-07",item:"Metal stud framing",trade:"Drywall",project:"Harbor Retail Fit-out",qty:8600,unit:"sq ft",price:3.10,markup:12,conf:"Medium",flag:"ok",rule:"No flag: framing layout measured, medium confidence only."},
+{id:"T-08",item:"LVT flooring",trade:"Flooring",project:"Harbor Retail Fit-out",qty:5400,unit:"sq ft",price:6.80,markup:10,conf:"High",flag:"ok",rule:"No flag: floor area and product confirmed."},
+{id:"T-09",item:"Carpet tile",trade:"Flooring",project:"Northgate Office",qty:3200,unit:"sq ft",price:4.90,markup:10,conf:"Low",flag:"measure",rule:"Measure to verify: carpeted area on the plan differs from the room schedule — re-measure before locking the quantity."},
+{id:"T-10",item:"VRF indoor units",trade:"HVAC",project:"Northgate Office",qty:14,unit:"ea",price:2850.00,markup:10,conf:"Medium",flag:"ok",rule:"No flag: unit count matches the mechanical schedule."},
+{id:"T-11",item:"Ductwork, galvanized",trade:"HVAC",project:"Maple Street Apartments",qty:2400,unit:"sq ft",price:12.40,markup:10,conf:"High",flag:"ok",rule:"No flag: duct runs measured and gauge confirmed."},
+{id:"T-12",item:"Panelboard 400A",trade:"Electrical",project:"Harbor Retail Fit-out",qty:3,unit:"ea",price:4200.00,markup:10,conf:"Low",flag:"low",rule:"Low confidence: panel schedule is unclear on this sheet — verify the schedule before this line is priced."},
+{id:"T-13",item:"Breakers 20A",trade:"Electrical",project:"Maple Street Apartments",qty:120,unit:"ea",price:42.00,markup:10,conf:"High",flag:"ok",rule:"No flag: breaker count matches the panel schedule."},
+{id:"T-14",item:"Concrete footings",trade:"Concrete",project:"Maple Street Apartments",qty:96,unit:"cy",price:210.00,markup:8,conf:"Medium",flag:"ok",rule:"No flag: footing sizes measured, medium confidence only."},
+{id:"T-15",item:"Acoustic ceiling tile",trade:"Drywall",project:"Northgate Office",qty:6800,unit:"sq ft",price:3.60,markup:12,conf:"High",flag:"ok",rule:"No flag: ceiling area confirmed from the reflected ceiling plan."},
+{id:"T-16",item:"Thermostat controls",trade:"HVAC",project:"Harbor Retail Fit-out",qty:22,unit:"ea",price:185.00,markup:10,conf:"Medium",flag:"ok",rule:"No flag: control points counted from the mechanical sheet."}
+];
+let state={q:"",proj:"",trade:"",flag:"",conf:"",only:false,page:0,resolved:new Set(),reviewed:new Set(),edits:{},notes:{},current:null};
+const labels={low:"Low confidence",spec:"Spec missing",measure:"Measure to verify",ok:"OK"};
+const money=n=>"$"+n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const canEdit=()=>document.getElementById("role").value==="estimator";
+function line(r){const e=state.edits[r.id]||{};const qty=e.qty!==undefined?e.qty:r.qty;const mk=e.markup!==undefined?e.markup:r.markup;return {qty,markup:mk,sub:qty*r.price,total:qty*r.price*(1+mk/100)};}
+function filtered(){return DATA.filter(r=>{if(state.q&&!(r.item+" "+r.trade+" "+r.project).toLowerCase().includes(state.q.toLowerCase()))return false;if(state.proj&&r.project!==state.proj)return false;if(state.trade&&r.trade!==state.trade)return false;if(state.conf&&r.conf!==state.conf)return false;if(state.flag&&r.flag!==state.flag)return false;if(state.only&&r.flag==="ok")return false;return true;});}
+function totals(){let sub=0,grand=0;DATA.forEach(r=>{const l=line(r);sub+=l.sub;grand+=l.total;});return{sub,grand,mark:grand-sub};}
+function render(){const list=filtered();const per=8;const pages=Math.max(1,Math.ceil(list.length/per));if(state.page>=pages)state.page=0;const slice=list.slice(state.page*per,state.page*per+per);
+const flagged=DATA.filter(r=>r.flag!=="ok"&&!state.resolved.has(r.id));
+const t=totals();
+document.getElementById("sTotal").textContent=DATA.length;
+document.getElementById("sFlag").textContent=flagged.length;
+document.getElementById("sEst").textContent=money(t.grand);
+document.getElementById("sDone").textContent=state.resolved.size;
+document.getElementById("rows").innerHTML=slice.length?slice.map(r=>{const l=line(r);return `<tr><td>${r.item}</td><td>${r.trade}</td><td>${r.project}</td><td>${l.qty} ${r.unit}</td><td>${money(r.price)}</td><td>${l.markup}%</td><td>${money(l.total)}</td><td><span class="conf conf-${r.conf}">${r.conf}</span></td><td><span class="flag ${r.flag}">${state.resolved.has(r.id)?"Resolved":labels[r.flag]+(state.reviewed.has(r.id)?" · Reviewed":"")}</span></td><td><button data-id="${r.id}">Review</button></td></tr>`;}).join(""):`<tr><td colspan="10">No lines match — try clearing the search or filters.</td></tr>`;
+document.getElementById("pageInfo").textContent=`Page ${state.page+1} of ${pages} · ${list.length} lines`;
+document.getElementById("prev").disabled=state.page===0;document.getElementById("next").disabled=state.page>=pages-1;
+document.getElementById("pSub").textContent=money(t.sub);
+document.getElementById("pMark").textContent=money(t.mark);
+document.getElementById("pGrand").textContent=money(t.grand);
+document.getElementById("pLines").textContent=DATA.length;
+document.getElementById("pOpen").textContent=flagged.length;
+document.getElementById("pWarn").textContent=flagged.length?`Warning: ${flagged.length} flagged line(s) still open — resolve them before sending the proposal.`:"All flagged lines resolved — proposal is ready to send.";
+document.querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>show(b.dataset.id));}
+function show(id){state.current=id;const r=DATA.find(x=>x.id===id);const can=canEdit();const l=line(r);
+document.getElementById("detail").style.display="block";
+document.getElementById("detail").innerHTML=`<h3 style="margin-top:0">${r.id} — ${r.item}</h3><p><b>${r.trade} · ${r.project} · ${l.qty} ${r.unit} · ${money(r.price)} per ${r.unit} · Markup ${l.markup}% · Line total ${money(l.total)}</b></p><p><b>Confidence:</b> <span class="conf conf-${r.conf}">${r.conf}</span></p><p><b>Flag rule:</b> ${r.rule}</p><p><label>Quantity<br><input id="eq" type="number" value="${l.qty}" ${!can?"disabled":""}></label> &nbsp; <label>Markup %<br><input id="em" type="number" value="${l.markup}" ${!can?"disabled":""}></label> &nbsp; <button id="apply" ${!can?"disabled":""}>Apply changes</button></p><p id="editErr" style="color:#991b1b;font-size:13px"></p><p><label>Estimator note<br><textarea id="note" rows="2" style="width:100%">${esc(state.notes[id]||"")}</textarea></label></p><p><button id="rev" ${!can||state.reviewed.has(id)?"disabled":""}>Mark reviewed</button> <button id="res" ${!can||state.resolved.has(id)?"disabled":""}>Mark resolved</button></p>${!can?"<p class='muted'>Viewer role is view-only — switch to Estimator to edit or resolve.</p>":""}`;
+document.getElementById("apply").onclick=()=>{if(!canEdit())return;const q=parseFloat(document.getElementById("eq").value);const m=parseFloat(document.getElementById("em").value);if(isNaN(q)||isNaN(m)||q<=0||m<0||m>100){document.getElementById("editErr").textContent="Quantity must be greater than 0 and markup must be between 0 and 100.";return;}state.notes[id]=document.getElementById("note").value;state.edits[id]={qty:q,markup:m};render();show(id);};
+document.getElementById("rev").onclick=()=>{if(!canEdit())return;state.notes[id]=document.getElementById("note").value;state.reviewed.add(id);render();show(id);};
+document.getElementById("res").onclick=()=>{if(!canEdit())return;state.notes[id]=document.getElementById("note").value;state.resolved.add(id);render();show(id);};}
+document.getElementById("q").oninput=e=>{state.q=e.target.value;state.page=0;render();};
+document.getElementById("proj").onchange=e=>{state.proj=e.target.value;state.page=0;render();};
+document.getElementById("trade").onchange=e=>{state.trade=e.target.value;state.page=0;render();};
+document.getElementById("conf").onchange=e=>{state.conf=e.target.value;state.page=0;render();};
+document.getElementById("flagf").onchange=e=>{state.flag=e.target.value;state.page=0;render();};
+document.getElementById("flagOnly").onchange=e=>{state.only=e.target.checked;state.page=0;render();};
+document.getElementById("role").onchange=()=>{render();if(state.current)show(state.current);};
+document.getElementById("prev").onclick=()=>{state.page--;render();};
+document.getElementById("next").onclick=()=>{state.page++;render();};
+document.getElementById("checklist").onchange=()=>{const n=document.querySelectorAll("#checklist input:checked").length;document.getElementById("progress").textContent=`${n} of 5 steps done`;};
+document.getElementById("failBtn").onclick=()=>{document.getElementById("err").style.display="block";};
+document.getElementById("retry").onclick=()=>{document.getElementById("err").style.display="none";render();};
+document.getElementById("exportBtn").onclick=()=>{
+const t=totals();
+const flagged=DATA.filter(r=>r.flag!=="ok"&&!state.resolved.has(r.id));
+let txt="PROPOSAL SUMMARY (SAMPLE DATA ONLY)\n\n";
+DATA.forEach(r=>{const l=line(r);txt+=`${r.item} (${r.trade}, ${r.project}) — ${l.qty} ${r.unit} x ${money(r.price)} + ${l.markup}% markup = ${money(l.total)}${state.resolved.has(r.id)?" [Resolved]":""}${state.reviewed.has(r.id)?" [Reviewed]":""}\n`;});
+txt+=`\nSubtotal: ${money(t.sub)}\nMarkups: ${money(t.mark)}\nGrand total: ${money(t.grand)}\nOpen flagged lines: ${flagged.length}\n\nDemo data only — no real plans, AI takeoff, or Quotr.ai integration.`;
+const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/plain"}));a.download="quotr-proposal-summary.txt";a.click();URL.revokeObjectURL(a.href);
+};
+setTimeout(()=>{document.getElementById("loading").style.display="none";document.getElementById("app").style.display="block";render();},1200);
+</script>
+</body>
+</html>
